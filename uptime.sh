@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Enter project name: "
+echo "Enter project name:"
 read Name
 
 echo "Your uptime percentage is:"
