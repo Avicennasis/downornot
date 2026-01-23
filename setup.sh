@@ -183,22 +183,99 @@ cat "$TEMPLATE_FILE" >> "$output_path"
 # Make the generated script executable
 chmod 755 "$output_path"
 
+# Generate systemd service file
+service_file="${name}.service"
+service_path="${SCRIPT_DIR}/${service_file}"
+
+cat > "$service_path" << EOF
+[Unit]
+Description=DownOrNot monitoring service for ${url}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=${output_path}
+Restart=always
+RestartSec=10
+User=${USER}
+WorkingDirectory=${SCRIPT_DIR}
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=downornot-${name}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "Generated systemd service file: $service_file"
+
+# Generate systemd timer file (alternative to service for periodic checks)
+timer_file="${name}.timer"
+timer_path="${SCRIPT_DIR}/${timer_file}"
+
+cat > "$timer_path" << EOF
+[Unit]
+Description=DownOrNot monitoring timer for ${url}
+Requires=${service_file}
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
+EOF
+
+echo "Generated systemd timer file: $timer_file"
+
 # Display success message with next steps
 echo ""
 echo "============================================="
 echo "   Setup Complete!"
 echo "============================================="
 echo ""
-echo "Generated script: $filename"
+echo "Generated files:"
+echo "  - Monitoring script: $filename"
+echo "  - Systemd service:   $service_file"
+echo "  - Systemd timer:     $timer_file"
 echo ""
-echo "To start monitoring, run:"
-echo "  ./${filename}"
+echo "============================================="
+echo "   OPTION 1: Systemd (Recommended)"
+echo "============================================="
 echo ""
-echo "To run as a background process:"
-echo "  nohup ./${filename} &"
+echo "1. Copy service file to systemd directory:"
+echo "   sudo cp ${service_file} /etc/systemd/system/"
 echo ""
-echo "To add to cron (runs on system startup):"
-echo "  @reboot /path/to/${filename}"
+echo "2. Enable and start the service:"
+echo "   sudo systemctl daemon-reload"
+echo "   sudo systemctl enable ${name}.service"
+echo "   sudo systemctl start ${name}.service"
 echo ""
-echo "Logs will be stored in: ~/logs/${name}/"
+echo "3. Check status:"
+echo "   sudo systemctl status ${name}.service"
+echo ""
+echo "4. View logs:"
+echo "   sudo journalctl -u ${name}.service -f"
+echo ""
+echo "============================================="
+echo "   OPTION 2: Crontab (Fallback)"
+echo "============================================="
+echo ""
+echo "1. Edit your crontab:"
+echo "   crontab -e"
+echo ""
+echo "2. Add this line to run on system startup:"
+echo "   @reboot ${output_path}"
+echo ""
+echo "============================================="
+echo ""
+echo "Application logs: ~/logs/${name}/"
+echo ""
+echo "To disable HTML emails, run with:"
+echo "  ${filename} --html-off"
+echo ""
 echo "============================================="
